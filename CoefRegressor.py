@@ -9,8 +9,10 @@ from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
 
 def main():
-    ce = Coefficient_Estimator('/home/zachsmith/Desktop/ML/data/morteza_data/ZIP_500_samples_smaller_TimeStep', 
-                                '/home/zachsmith/Desktop/ML/data/morteza_data/',
+    path_to_inputs = r'C:\Users\Zach\Desktop\coefficient_estimator\data\inputs'
+    path_to_targets = r'C:\Users\Zach\Desktop\coefficient_estimator\data'
+    ce = Coefficient_Estimator(path_to_inputs, 
+                                path_to_targets,
                                 coef_index=0)
     ce.load_data()
     ce.fit_coefficients()

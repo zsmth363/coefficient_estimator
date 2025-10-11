@@ -9,9 +9,11 @@ from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
 
 def main():
-    ce = Coefficient_Estimator('/home/zachsmith/Desktop/ML/data/morteza_data/ZIP_500_samples_smaller_TimeStep', 
-                                '/home/zachsmith/Desktop/ML/data/morteza_data/',
-                                coef_index=0)
+    path_to_inputs = r'C:\Users\Zach\Desktop\coefficient_estimator\data\inputs'
+    path_to_targets = r'C:\Users\Zach\Desktop\coefficient_estimator\data'
+    ce = Coefficient_Estimator(path_to_inputs, 
+                                path_to_targets,
+                                coef_index=2)
     ce.load_data()
     ce.train_model()
     ce.save_model()
@@ -84,7 +86,7 @@ class Coefficient_Estimator:
         self.learning_rate = 0.001
         self.coef_index = kwargs.get('coef_index',2)
         self.test_train_split_factor = 0.8
-        self.target_quantization_step = 0.2
+        self.target_quantization_step = 0.50
         num_steps = 1/self.target_quantization_step + 1
 
         self.model = CNN(self.out_chnl1, self.out_chnl2, self.out_chnl3, self.ks_1, self.ks_2, self.ks_3,num_steps)
@@ -102,7 +104,7 @@ class Coefficient_Estimator:
             [f for f in os.listdir(self.input_path) if f.endswith('.csv')],
             key=lambda x: x.split('_')[1]
         )
-        zip_files = [f for f in os.listdir(self.target_path) if 'zip_' in f and '500' in f]
+        zip_files = [f for f in os.listdir(self.target_path) if 'zip_' in f]
 
         # Load targets
         target_data = []
