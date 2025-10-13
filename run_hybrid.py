@@ -1,4 +1,5 @@
-from hybrid_framework import HybridModel,LoadExcelRegressionDataset
+from hybrid_framework import HybridModel
+from create_dataset import LoadExcelRegressionDataset
 from features import extract_features
 import numpy as np
 import pandas as pd
@@ -37,11 +38,20 @@ def main():
     dataset = LoadExcelRegressionDataset(path_to_inputs, path_to_targets, fs=fs)
 
     if not rfr:
-        # Split
-        train_set, val_set, test_set = make_splits(dataset)
-        
-        # scaler_X = StandardScaler()
-        # X_train_scaled = scaler_X.fit_transform(train_set)
+        train_set = LoadExcelRegressionDataset(
+            path_to_inputs, path_to_targets, fs=fs, split='train', return_sequence=True
+        )
+
+        # --- Validation / test sets (reuse train scaler) ---
+        val_set = LoadExcelRegressionDataset(
+            path_to_inputs, path_to_targets, fs=fs, split='val', return_sequence=True
+        )
+        val_set.set_scaler(train_set.scaler)
+
+        test_set = LoadExcelRegressionDataset(
+            path_to_inputs, path_to_targets, fs=fs, split='test', return_sequence=True
+        )
+        test_set.set_scaler(train_set.scaler)
         # X_val_scaled = scaler_X.transform(val_set)
 
         # # Scale targets
@@ -70,7 +80,7 @@ def main():
         optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
         # Train
-        model = train_model(model, train_loader, val_loader, criterion, optimizer, device, epochs=20)
+        model = train_model(model, train_loader, val_loader, criterion, optimizer, device, epochs=50)
 
         # Test
         stats,results = test(model, test_loader, device)

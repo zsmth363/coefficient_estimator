@@ -5,10 +5,6 @@ from numpy.polynomial import Polynomial
 
 def extract_stat_features(signal):
     """Basic statistical descriptors of a 1D signal."""
-    try:
-        np.sqrt(np.mean(signal**2))
-    except RuntimeWarning:
-        print(signal)
     return {
         "mean": np.mean(signal),
         "std": np.std(signal),
