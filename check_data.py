@@ -19,16 +19,12 @@ def find_excels_with_nans(folder_path):
                 df = pd.read_excel(file_path)
                 if (df[df.columns[2]] == 0).all():
                     print(filename)
-                # plt.plot(df[df.columns[2]])
-                # if df[df.columns[2]].mean() < 0.3:
-                #     print(filename)
-                # if df.isna().any().any():  # check if any NaN exists
-                #     files_with_nans.append(filename)
+                if df.isna().any().any():  # check if any NaN exists
+                    files_with_nans.append(filename)
             except Exception as e:
-                print(f"⚠️ Could not read {filename}: {e}")
+                print(f"Could not read {filename}: {e}")
     
     return files_with_nans
-
 
 
 def copy_nonzero_excel_files(src_folder, dest_folder="data"):
@@ -67,9 +63,20 @@ def copy_nonzero_excel_files(src_folder, dest_folder="data"):
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
 
-# Example usage:
-folder = r"""C:\Users\Zach\OneDrive - Clemson University\IM_runs\IM_results_10-6"""
-path = r"""C:\Users\Zach\OneDrive - Clemson University\IM_runs"""
+folder = r""""""
+path = r""""""
+if not os.path.exists(path):
+    os.mkdir(path)
 copy_nonzero_excel_files(folder,path)
-# bad_files = find_excels_with_nans(folder)
-# print("Files with NaN values:", bad_files)
+nan_files = find_excels_with_nans(path)
+for filename in nan_files:
+    file_path = os.path.join(path, filename)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            print(f"Deleted: {filename}")
+        except Exception as e:
+            print(f"Error deleting {filename}: {e}")
+    else:
+        print(f"File not found: {filename}")
+print("Files with NaN values:", nan_files)

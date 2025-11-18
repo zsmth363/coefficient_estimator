@@ -59,8 +59,19 @@ def extract_features(window, fs, voltage=None, power=None):
         feats.update({f"ch{ch}_{k}": v for k, v in extract_stat_features(sig).items()})
         # feats.update({f"ch{ch}_{k}": v for k, v in extract_fft_features(sig, fs).items()})
 
-    # # Domain-specific: fit polynomial P(V) = aV^2 + bV + c
-    # if voltage is not None and power is not None:
-    #     feats.update(extract_poly_features(voltage, power, degree=2))
+    Vn = window[2,:]
+    Pn = window[0,:]
+    dV = np.diff(Vn)
+    thr = np.percentile(np.abs(dV), 95)
+    idx = np.where(np.abs(dV) > thr)[0]
+    if len(idx) > 0:
+        i0 = idx[0]
+        # look short window after event
+        w = int(0.2 * fs)
+        segP = Pn[i0:i0+w]
+        feats['transient_P_peak'] = np.max(segP) - segP[0]
+        # exponential decay fit could be added
+    else:
+        feats['transient_P_peak'] = 0.0
 
     return feats

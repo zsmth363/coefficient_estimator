@@ -62,15 +62,15 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-from features import extract_features
+from features import extract_features, extract_poly_features
 from torch.utils.data import Dataset
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
 class LoadExcelRegressionDataset(Dataset):
     def __init__(self, folder, target_csv, fs, split='train',
-                 train_ratio=0.7, val_ratio=0.15, test_ratio=0.15,
-                 seed=42, return_sequence=True):
+                 train_ratio=0.7, val_ratio=0.2, test_ratio=0.1,
+                 seed=42, return_sequence=True, use_polyfit=True):
         """
         folder     : path with all XXX_outputs.xlsx files
         target_csv : CSV with columns [file, target]
@@ -82,6 +82,7 @@ class LoadExcelRegressionDataset(Dataset):
         self.fs = fs
         self.split = split.lower()
         self.return_sequence = return_sequence
+        self.use_polyfit = use_polyfit
         self.seed = seed
 
         # ---------- 1. Load valid input files ----------
@@ -154,18 +155,75 @@ class LoadExcelRegressionDataset(Dataset):
         for file in files:
             path = os.path.join(self.folder, file)
             df = pd.read_excel(path)
-            cols = [df.columns.to_list()[i] for i in [2, 5, 6]]  # voltage, freq, power
+            # df = df.loc[df["Time(s)"] > 2]
+            df["Pagg"] = df.iloc[:,1] + df.iloc[:,2]
+            cols = [df.columns.to_list()[i] for i in [-1,5,6]]  # voltage, freq, power TODO: CHANGING THIS CHANGES WHICH CHANNELS ARE USED AS INPUTS
             df = df[cols]
-            window = df.values.T.astype(np.float32)  # [channels, timesteps]
+            # df = df[df[cols[2]] > 0.9]
+            # df["dPdV"] = np.gradient(df.values.T.astype(np.float32)[0],df.values.T.astype(np.float32)[2])
+            window = df.values.T.astype(np.float32) # [channels, timesteps]
 
             feats = extract_features(window, self.fs)
-            feat_vec = np.array(list(feats.values()), dtype=np.float32)
+            corrVP = np.corrcoef(df.values.T.astype(np.float32)[2],df.values.T.astype(np.float32)[0])[0][1]
+            corrV2P = np.corrcoef(df.values.T.astype(np.float32)[2]**2,df.values.T.astype(np.float32)[0])[0][1]
+            df1 = df.loc[df[cols[2]] >= 0.95].copy()
+
+            # Create bins and group by them
+            num_bins = 25
+            df1['V_bin'] = pd.cut(df1[cols[2]], bins=np.linspace(df1[cols[2]].min(), df1[cols[2]].max(), num_bins + 1))
+
+            # Compute mean per bin
+            grouped = df1.groupby('V_bin',observed=True).agg({cols[2]: 'mean', cols[0]: 'mean'}).dropna()
+
+            V_means = grouped[cols[2]].values
+            P_means = grouped[cols[0]].values
+            poly_coef = np.array(list(extract_poly_features(V_means,P_means/7.67).values()))
+            poly_coef = np.clip(poly_coef,0,1)
+            poly_coef = poly_coef/sum(poly_coef)
+            
+            if self.use_polyfit:
+                feat_vec = np.array(list(feats.values()) + [corrVP,corrV2P]+ list(poly_coef), dtype=np.float32)
+            else:
+                feat_vec = np.array(list(feats.values()) + [corrVP,corrV2P], dtype=np.float32)
             if np.any(np.isnan(feat_vec)):
                 print(f"NaN in features: {file}")
 
             all_feats.append(feat_vec)
+            df[cols[0]] = df[cols[0]]/7.67 # This is hardcoded. Needs to be generalized
+            window = torch.tensor(df.values, dtype=torch.float32)  # shape (timesteps, channels)
             all_windows.append(window)
+            all_equal = len(set(len(sublist) for sublist in all_windows)) == 1
+            if not all_equal:
+                print(file)
         return np.vstack(all_feats), all_windows
+    
+    def rotate_data(self,V, P, degrees, around_mean=True):
+        # Convert to radians
+        theta = np.deg2rad(degrees)
+        
+        # Optionally rotate around the mean instead of the origin
+        if around_mean:
+            V0, P0 = np.median(V), np.median(P)
+            Vc, Pc = V - V0, P - P0
+        else:
+            Vc, Pc = V, P
+        
+        # Rotation matrix
+        rotation_matrix = np.array([
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta),  np.cos(theta)]
+        ])
+        
+        # Apply rotation
+        rotated = rotation_matrix @ np.vstack([Vc, Pc])
+        V_rot, P_rot = rotated[0, :], rotated[1, :]
+        
+        # Shift back if rotated around mean
+        if around_mean:
+            V_rot += V0
+            P_rot += P0
+
+        return V_rot, P_rot
 
     # ---------- dataset API ----------
     def __len__(self):
